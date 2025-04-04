@@ -33,7 +33,7 @@ function sanitizeContent(text) {
 function getPageContent() {
   const selectedText = window.getSelection().toString().trim();
   let content = '';
-  
+
   if (selectedText) {
     state.selectedText = selectedText;
     content = selectedText;
@@ -41,9 +41,9 @@ function getPageContent() {
     content = Array.from(document.body.getElementsByTagName('*'))
       .filter(element => {
         const style = window.getComputedStyle(element);
-        return style.display !== 'none' && 
-               style.visibility !== 'hidden' && 
-               !element.hidden;
+        return style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          !element.hidden;
       })
       .map(element => {
         return Array.from(element.childNodes)
@@ -55,10 +55,10 @@ function getPageContent() {
       .join('\n')
       .replace(/[\s\n]+/g, ' ')
       .trim();
-    
+
     state.pageText = content;
   }
-  
+
   return sanitizeContent(content);
 }
 

@@ -6,6 +6,15 @@ if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
   console.debug('Loading in Chrome mode');
 }
 
+document.getElementById('openPopup').addEventListener('click', () => {
+  document.getElementById('popupBox').classList.remove('hidden');
+});
+
+document.getElementById('closePopup').addEventListener('click', () => {
+  document.getElementById('popupBox').classList.add('hidden');
+});
+
+
 import hljs from 'highlight.js';
 import { marked } from 'marked';
 import 'highlight.js/styles/github.css';
@@ -257,6 +266,116 @@ async function loadTabContent() {
     loading.classList.add('hidden');
   }
 }
+// // ✅ Add event listener to highlight text inside <h1> and <h2> tags
+// document.getElementById('highlightButton').addEventListener('click', async () => {
+//   const userInput = document.getElementById('newActionInput').value.trim();
+
+//   if (!userInput) {
+//     alert('Please enter a word to highlight.');
+//     return;
+//   }
+
+//   const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
+
+//   if (!tab) return;
+
+//   await browserAPI.scripting.executeScript({
+//     target: { tabId: tab.id },
+//     args: [userInput],
+//     func: (searchWord) => {
+//       if (!searchWord) return;
+
+//       const highlightColor = 'yellow';
+
+
+//       function highlightText(tag, word) {
+//         document.querySelectorAll(tag).forEach(el => {
+//           const regex = new RegExp(`(${word})`, 'gi'); // Case-insensitive search
+//           el.innerHTML = el.innerHTML.replace(regex, `<span style="background-color: ${highlightColor};">$1</span>`);
+//         });
+//       }
+//       highlightText('h1', searchWord);
+//       highlightText('h2', searchWord);
+//       highlightText('p', searchWord);
+//     }
+//   });
+// });
+
+document.getElementById('highlightButton').addEventListener('click', async () => {
+  const userInput = document.getElementById('newActionInput').value.trim();
+
+  if (!userInput) {
+    alert('Please enter a word to highlight.');
+    return;
+  }
+
+  const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
+
+  if (!tab) return;
+
+  await browserAPI.scripting.executeScript({
+    target: { tabId: tab.id },
+    args: [userInput],
+    func: (searchWord) => {
+      if (!searchWord) return;
+
+      const highlightColor = 'yellow';
+      let found = false;
+
+      // Remove old highlights
+      document.querySelectorAll('.highlighted').forEach(span => {
+        const parent = span.parentNode;
+        parent.replaceChild(document.createTextNode(span.textContent), span);
+        parent.normalize();
+      });
+
+      const tags = ['h1', 'h2', 'p'];
+      const regex = new RegExp(searchWord, 'gi');
+
+      tags.forEach(tag => {
+        document.querySelectorAll(tag).forEach(el => {
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          const nodesToHighlight = [];
+
+          while (walker.nextNode()) {
+            const node = walker.currentNode;
+            if (regex.test(node.textContent)) {
+              found = true;
+              nodesToHighlight.push(node);
+            }
+          }
+
+          nodesToHighlight.forEach(node => {
+            const matches = [...node.textContent.matchAll(regex)];
+            let offset = 0;
+
+            matches.forEach(match => {
+              const range = document.createRange();
+              const start = match.index + offset;
+              const end = start + match[0].length;
+
+              range.setStart(node, start);
+              range.setEnd(node, end);
+
+              const span = document.createElement('span');
+              span.className = 'highlighted';
+              span.style.backgroundColor = highlightColor;
+              range.surroundContents(span);
+
+              offset += span.outerHTML.length - match[0].length;
+            });
+          });
+        });
+      });
+
+      // If nothing was highlighted, show alert
+      if (!found) {
+        alert(`No word found: "${searchWord}"`);
+      }
+    }
+  });
+});
+
 
 // Add missing handlers
 async function handleQuickAction() {
@@ -358,12 +477,11 @@ async function handleSendToChat_old() {
     loading.classList.add('hidden');
   }
 }
-
 async function handleSendToChat() {
   const loading = document.getElementById('loading');
   const responseArea = document.getElementById('response');
-  const content = document.getElementById('content');
-  const question = document.getElementById('question');
+  const content = document.getElementById('content').value;
+  const question = document.getElementById('question').value;
 
   if (!loading || !responseArea || !content || !question) {
     console.error('Required elements not found');
@@ -375,27 +493,26 @@ async function handleSendToChat() {
 
   try {
     const result = await $.ajax({
-      url: 'http://127.0.0.1:8000/browserPlugin/v1/webHelper', // Replace with your API endpoint
+      url: 'http://127.0.0.1:8000/browserPlugin/v1/webHelper',
       method: 'POST',
       contentType: 'application/json',
       data: JSON.stringify({
         action: 'sendToAPI',
-        content: content.value,
-        userQuestion: question.value
+        content: content,
+        userQuestion: question // Ensure this field is included
       }),
       success: function (data) {
         console.log('data', data);
-        // displayResponse(data);
-
+        displayResponse(data);
       }
     });
 
-    displayResponse(data);
+    displayResponse(result);
   } catch (error) {
     console.error('Communication error:', error);
     displayResponse({
       success: false,
-      error: error.message || 'Failed to communicate with extension. Please try reloading.'
+      error: error.responseJSON?.detail[0]?.msg || 'Failed to communicate with extension. Please try reloading.'
     });
   } finally {
     loading.classList.add('hidden');
@@ -443,64 +560,26 @@ browserAPI.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 function displayResponse(response) {
-  // First ensure response area exists, if not initialize it
-  if (!document.getElementById('response')) {
-    initializeResponseArea();
-  }
-
   const responseArea = document.getElementById('response');
   if (!responseArea) {
-    console.error('Failed to initialize response area');
+    console.error('Response area not found');
     return;
   }
 
-  // Ensure child elements exist
-  if (!responseArea.querySelector('#responseContent')) {
-    const content = document.createElement('div');
-    content.id = 'responseContent';
-    responseArea.appendChild(content);
-  }
-
   const responseContent = document.getElementById('responseContent');
-  const copyButton = document.getElementById('copyToClipboard');
+  if (!responseContent) {
+    console.error('Response content area not found');
+    return;
+  }
 
   responseArea.classList.remove('hidden');
 
   if (!response.success) {
-    responseContent.innerHTML = `<div class="error-message">❌ ${response.error.trim()}</div>`;
+    responseContent.textContent = `❌ ${response.error}`;
     return;
   }
 
-  if (!response.message) {
-    responseContent.innerHTML = `<div class="error-message">❌ No message received from the backend.</div>`;
-    return;
-  }
-
-  try {
-    if (typeof marked === 'undefined') {
-      responseContent.innerHTML = `<div class="text-content">${response.message.trim().replace(/\n/g, '<br>')}</div>`;
-      return;
-    }
-
-    let htmlContent = marked.parse(response.message.trim());
-    responseContent.innerHTML = htmlContent;
-
-    if (typeof hljs !== 'undefined') {
-      responseContent.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
-      });
-    }
-
-  } catch (error) {
-    console.error('Response processing error:', error);
-    responseContent.textContent = response.message;
-  }
-
-  if (responseContent.textContent.trim()) {
-    copyButton.disabled = false;
-  } else {
-    copyButton.disabled = true;
-  }
+  responseContent.textContent = response.message || 'No message received from the backend.';
 }
 
 function initializeResponseArea() {
