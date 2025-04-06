@@ -19,8 +19,8 @@
   "dependencies": {
     "@tailwindcss/forms": "^0.5.9",
     "highlight.js": "^11.9.0",
-    "marked": "^9.0.3",   
     "jquery": "^3.6.0",
+    "marked": "^9.0.3",
     "remixicon": "^4.5.0",
     "webextension-polyfill": "^0.10.0"
   },

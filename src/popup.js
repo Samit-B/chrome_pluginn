@@ -560,16 +560,18 @@ browserAPI.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 function displayResponse(response) {
-  const responseArea = document.getElementById('response');
+  let responseArea = document.getElementById('response');
   if (!responseArea) {
-    console.error('Response area not found');
-    return;
+    console.error('Response area not found. Initializing...');
+    responseArea = initializeResponseArea();
   }
 
-  const responseContent = document.getElementById('responseContent');
+  let responseContent = document.getElementById('responseContent');
   if (!responseContent) {
-    console.error('Response content area not found');
-    return;
+    console.error('Response content area not found. Creating...');
+    responseContent = document.createElement('div');
+    responseContent.id = 'responseContent';
+    responseArea.appendChild(responseContent);
   }
 
   responseArea.classList.remove('hidden');
@@ -593,8 +595,12 @@ function initializeResponseArea() {
     document.querySelector('.container')?.appendChild(responseArea);
   }
 
-  // Clear existing content and maintain structure
-  responseArea.innerHTML = `< div id = "responseContent" ></div > `;
+  // Ensure responseContent exists
+  if (!document.getElementById('responseContent')) {
+    const responseContent = document.createElement('div');
+    responseContent.id = 'responseContent';
+    responseArea.appendChild(responseContent);
+  }
 
   return responseArea;
 }
